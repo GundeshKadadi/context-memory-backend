@@ -55,7 +55,7 @@ export async function parseMemory(
 
       console.error(
         "Request ID:",
-        error.request_id
+        error.requestID
       );
 
       return res
