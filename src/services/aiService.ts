@@ -1,3 +1,5 @@
+import OpenAI from "openai";
+
 export type ParsedMemory = {
   title: string;
 
@@ -25,34 +27,67 @@ export type ParsedMemory = {
 };
 
 
-type OllamaResponse = {
-  message?: {
-    content?: string;
-  };
-};
-
-
 export async function parseMemoryWithAI(
   text: string
 ): Promise<ParsedMemory> {
+  const provider =
+    process.env.AI_PROVIDER ||
+    "ollama";
 
-  const ollamaUrl =
-    process.env.OLLAMA_URL ||
-    "http://127.0.0.1:11434";
+  if (provider === "groq") {
+    return parseWithGroq(text);
+  }
+
+  return parseWithOllama(text);
+}
+
+
+// =====================================
+// GROQ
+// =====================================
+
+async function parseWithGroq(
+  text: string
+): Promise<ParsedMemory> {
+  const apiKey =
+    process.env.GROQ_API_KEY;
+
+  if (!apiKey) {
+    throw new Error(
+      "GROQ_API_KEY is missing"
+    );
+  }
+
+  const client =
+    new OpenAI({
+      apiKey,
+
+      baseURL:
+        "https://api.groq.com/openai/v1",
+    });
+
 
   const model =
-    process.env.OLLAMA_MODEL ||
-    "qwen3:4b-instruct";
+    process.env.GROQ_MODEL ||
+    "openai/gpt-oss-20b";
 
 
-  const prompt = `
+  const response =
+    await client.chat.completions.create({
+      model,
+
+      messages: [
+        {
+          role: "system",
+
+          content: `
 You are the AI parser for an application called Context Memory.
 
-Convert the user's natural-language reminder into JSON.
+Convert the user's natural-language memory into structured JSON.
 
 Return ONLY valid JSON.
 
-Required format:
+Required JSON format:
 
 {
   "title": "string",
@@ -74,21 +109,144 @@ LOCATION:
 Relevant when arriving at or being near a place.
 
 PROJECT:
-Relevant to a work project.
+Relevant to a project or work task.
 
 TIME:
-Relevant to a particular time, date, or day.
+Relevant to a time, date, or day.
 
 CUSTOM:
-Use when the other categories do not clearly apply.
+Use when none of the above clearly fit.
 
 Do not invent people, places, projects, or dates.
 
 Priority should normally be NORMAL.
 
-locationIntent must only be true when location is relevant.
+locationIntent should be true only when location is relevant.
 
-placeName must be null when no location is mentioned.
+placeName should be null when no location is mentioned.
+
+confidence must be between 0 and 1.
+          `.trim(),
+        },
+
+        {
+          role: "user",
+          content: text,
+        },
+      ],
+
+      response_format: {
+        type: "json_object",
+      },
+
+      temperature: 0.2,
+    });
+
+
+  const content =
+    response.choices[0]
+      ?.message
+      ?.content;
+
+
+  if (!content) {
+    throw new Error(
+      "Groq returned an empty response"
+    );
+  }
+
+
+  let parsed:
+    ParsedMemory;
+
+
+  try {
+    parsed =
+      JSON.parse(
+        content
+      ) as ParsedMemory;
+  } catch {
+    console.error(
+      "Groq output:",
+      content
+    );
+
+    throw new Error(
+      "Unable to parse Groq response"
+    );
+  }
+
+
+  validateParsedMemory(
+    parsed
+  );
+
+
+  return parsed;
+}
+
+
+// =====================================
+// OLLAMA
+// =====================================
+
+async function parseWithOllama(
+  text: string
+): Promise<ParsedMemory> {
+  const ollamaUrl =
+    process.env.OLLAMA_URL ||
+    "http://127.0.0.1:11434";
+
+
+  const model =
+    process.env.OLLAMA_MODEL ||
+    "qwen3:4b-instruct";
+
+
+  const prompt = `
+You are the AI parser for an application called Context Memory.
+
+Convert the user's natural-language memory into JSON.
+
+Return ONLY valid JSON.
+
+Required JSON format:
+
+{
+  "title": "string",
+  "context": "string",
+  "type": "PERSON | LOCATION | PROJECT | TIME | CUSTOM",
+  "trigger": "string",
+  "priority": "LOW | NORMAL | HIGH",
+  "locationIntent": true,
+  "placeName": "string or null",
+  "confidence": 0.95
+}
+
+Rules:
+
+PERSON:
+Relevant when interacting with a person.
+
+LOCATION:
+Relevant when arriving at or being near a place.
+
+PROJECT:
+Relevant to a project or work task.
+
+TIME:
+Relevant to a time, date, or day.
+
+CUSTOM:
+Use when none of the above clearly fit.
+
+Do not invent people, places, projects, or dates.
+
+Priority should normally be NORMAL.
+
+locationIntent should be true only when location is relevant.
+
+placeName should be null when no location is mentioned.
 
 confidence must be between 0 and 1.
 
@@ -138,8 +296,11 @@ ${text}
 
 
   const data =
-    await response.json() as
-      OllamaResponse;
+    await response.json() as {
+      message?: {
+        content?: string;
+      };
+    };
 
 
   const content =
@@ -153,7 +314,9 @@ ${text}
   }
 
 
-  let parsed: ParsedMemory;
+  let parsed:
+    ParsedMemory;
+
 
   try {
     parsed =
@@ -161,11 +324,6 @@ ${text}
         content
       ) as ParsedMemory;
   } catch {
-    console.error(
-      "Ollama output:",
-      content
-    );
-
     throw new Error(
       "Unable to parse Ollama response"
     );
@@ -181,6 +339,10 @@ ${text}
 }
 
 
+// =====================================
+// VALIDATION
+// =====================================
+
 function validateParsedMemory(
   memory: ParsedMemory
 ) {
@@ -191,6 +353,7 @@ function validateParsedMemory(
     "TIME",
     "CUSTOM",
   ];
+
 
   const validPriorities = [
     "LOW",
