@@ -13,6 +13,7 @@ import {
 
 import authRoutes from "./routes/authRoutes";
 import memoryRoutes from "./routes/memoryRoutes";
+import aiRoutes from "./routes/aiRoutes";
 
 import {
   apiLimiter,
@@ -123,7 +124,10 @@ app.use(
   "/api/memories",
   memoryRoutes
 );
-
+app.use(
+  "/api/ai",
+  aiRoutes
+);
 
 // ------------------------------------
 // 404
