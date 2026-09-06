@@ -1,66 +1,39 @@
-import {
-  CorsOptions,
-} from "cors";
-
+import { CorsOptions } from "cors";
 
 const allowedOrigins =
   process.env.WEB_ORIGINS
     ?.split(",")
-    .map(
-      (origin) =>
-        origin.trim()
-    )
+    .map((origin) => origin.trim())
     .filter(Boolean) ?? [];
-
 
 console.log(
   "🌐 Allowed CORS origins:",
   allowedOrigins
 );
 
-
-export const corsOptions:
-  CorsOptions = {
-
-  origin(
-    origin,
-    callback
-  ) {
-
+export const corsOptions: CorsOptions = {
+  origin(origin, callback) {
     console.log(
-      "🌐 Request origin:",
+      "🌐 Incoming Origin:",
       origin
     );
 
-
-    // Android / iOS / Postman
-    // may not send Origin
+    // Android / iOS native / Postman
+    // usually do not send Origin
     if (!origin) {
-      callback(
-        null,
-        true
-      );
-
+      callback(null, true);
       return;
     }
-
 
     if (
-      allowedOrigins.includes(
-        origin
-      )
+      allowedOrigins.includes(origin)
     ) {
-      callback(
-        null,
-        true
-      );
-
+      callback(null, true);
       return;
     }
 
-
     console.warn(
-      `❌ Blocked CORS origin: ${origin}`
+      `❌ CORS blocked: ${origin}`
     );
 
     callback(
@@ -69,7 +42,6 @@ export const corsOptions:
       )
     );
   },
-
 
   methods: [
     "GET",
@@ -85,10 +57,7 @@ export const corsOptions:
     "Authorization",
   ],
 
-  credentials:
-    false,
+  credentials: false,
 
-
-  optionsSuccessStatus:
-    204,
+  optionsSuccessStatus: 204,
 };
