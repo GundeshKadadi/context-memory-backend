@@ -2,66 +2,80 @@ import {
   CorsOptions,
 } from "cors";
 
-const configuredOrigins =
+
+const allowedOrigins =
   process.env.WEB_ORIGINS
     ?.split(",")
-    .map((origin) =>
-      origin.trim()
+    .map(
+      (origin) =>
+        origin.trim()
     )
     .filter(Boolean) ?? [];
 
-const developmentOrigins = [
-  "http://localhost:8081",
-  "http://127.0.0.1:8081",
-  "http://localhost:19006",
-  "http://127.0.0.1:19006",
-];
 
-const allowedOrigins =
-  process.env.NODE_ENV ===
-  "production"
-    ? configuredOrigins
-    : [
-        ...new Set([
-          ...configuredOrigins,
-          ...developmentOrigins,
-        ]),
-      ];
+console.log(
+  "🌐 Allowed CORS origins:",
+  allowedOrigins
+);
+
 
 export const corsOptions:
   CorsOptions = {
-  origin(origin, callback) {
-    // Android/iOS/Postman may not send an Origin header
+
+  origin(
+    origin,
+    callback
+  ) {
+
+    console.log(
+      "🌐 Request origin:",
+      origin
+    );
+
+
+    // Android / iOS / Postman
+    // may not send Origin
     if (!origin) {
-      callback(null, true);
+      callback(
+        null,
+        true
+      );
+
       return;
     }
+
 
     if (
       allowedOrigins.includes(
         origin
       )
     ) {
-      callback(null, true);
+      callback(
+        null,
+        true
+      );
+
       return;
     }
 
+
     console.warn(
-      `Blocked CORS origin: ${origin}`
+      `❌ Blocked CORS origin: ${origin}`
     );
 
     callback(
       new Error(
-        "Origin not allowed by CORS"
+        `Origin ${origin} is not allowed by CORS`
       )
     );
   },
 
+
   methods: [
     "GET",
     "POST",
-    "PATCH",
     "PUT",
+    "PATCH",
     "DELETE",
     "OPTIONS",
   ],
@@ -70,4 +84,11 @@ export const corsOptions:
     "Content-Type",
     "Authorization",
   ],
+
+  credentials:
+    false,
+
+
+  optionsSuccessStatus:
+    204,
 };
